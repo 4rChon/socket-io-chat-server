@@ -32,7 +32,7 @@ const readMessages = async (roomId) => {
 const readMessagesSlice = async (roomId, offset, size) => {
   const room = await Room.findOne({ roomId }).exec();
   offset = room.messages.length - offset;
-  return room.messages.slice(offset - size, offset);
+  return room.messages.slice(Math.max(offset - size, 0), offset);
 };
 
 const readRooms = async () => {

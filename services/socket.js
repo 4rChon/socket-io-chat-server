@@ -5,21 +5,7 @@ const { RequestType, Request, Response } = require("../enums");
 const ADDRESS = process.env.ADDRESS;
 const PORT = process.env.PORT;
 
-const io = socketIo(
-  server
-  //   {
-  //   handlePreflightRequest: (req, res) => {
-  //     const headers = {
-  //       "Access-Control-Allow-Headers": "*",
-  //       "Access-Control-Allow-Origin": `https://${ADDRESS}:${PORT}/`,
-  //       "Access-Control-Request-Method": "*",
-  //       "Access-Control-Allow-Credentials": true,
-  //     };
-  //     res.writeHead(200, headers);
-  //     res.end();
-  //   },
-  // }
-);
+const io = socketIo(server);
 
 let userList = {};
 let roomList = {};
@@ -161,17 +147,28 @@ const onPost = (socket, request, data) => {
   }
 };
 
+const onDisconnect = (io, socket) => {
+  const roomId = userList[socket.id].roomId;
+  updateTypists(socket.id, userList[socket.id].nick, roomId, false);
+  messageRoom(roomId, `${userList[socket.id].nick} left #${roomId}.`);
+  io.emit(Response.UPDATE_ROOM, { [roomId]: roomList[roomId] });
+  io.emit(Response.DELETE_USER, socket.id);
+  delete userList[socket.id];
+  console.log("Client disconnected");
+};
+
+const onConnect = (io, socket) => {
+  console.log("Client connected");
+  userList[socket.id] = { id: socket.id, nick: socket.id, roomId: "Common" };
+  socket.emit(Response.SET_ID, socket.id);
+  setNick(socket, `anon${++userIdCount}`);
+  setRoom(socket, "Common", messageRoom);
+  io.emit(Response.ADD_USER, userList[socket.id]);
+};
+
 const initSocket = () => {
   io.on("connection", (socket) => {
-    socket.on("disconnect", () => {
-      const roomId = userList[socket.id].roomId;
-      updateTypists(socket.id, userList[socket.id].nick, roomId, false);
-      messageRoom(roomId, `${userList[socket.id].nick} left #${roomId}.`);
-      io.emit(Response.UPDATE_ROOM, { [roomId]: roomList[roomId] });
-      io.emit(Response.DELETE_USER, socket.id);
-      delete userList[socket.id];
-      console.log("Client disconnected");
-    });
+    socket.on("disconnect", () => onDisconnect(io, socket));
 
     socket.on(RequestType.COMMAND, (commands) => onCommand(socket, commands));
     socket.on(RequestType.MESSAGE, (data) => onMessage(socket, data));
@@ -180,14 +177,8 @@ const initSocket = () => {
       onPost(socket, request, data)
     );
 
-    console.log("Client connected");
-    userList[socket.id] = { id: socket.id, nick: socket.id, roomId: "Common" };
-    socket.emit(Response.SET_ID, socket.id);
-    setNick(socket, `anon${++userIdCount}`);
-    setRoom(socket, "Common", messageRoom);
-    io.emit(Response.ADD_USER, userList[socket.id]);
+    onConnect(io, socket);
   });
-
   return io;
 };
 

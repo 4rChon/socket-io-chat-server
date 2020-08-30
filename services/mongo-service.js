@@ -16,11 +16,7 @@ module.exports = db;
 const Room = require("../models/room");
 
 const createRoom = async (roomId) => {
-  await Room.findOneAndUpdate(
-    { roomId: roomId },
-    { roomId: roomId },
-    { upsert: true }
-  ).exec();
+  await Room.findOneAndUpdate({ roomId }, { roomId }, { upsert: true }).exec();
 };
 
 const createMessage = async (roomId, socketId, nick, message) => {
@@ -34,7 +30,7 @@ const createMessage = async (roomId, socketId, nick, message) => {
 
 const readMessageCount = async (roomId) => {
   return await Room.aggregate()
-    .match({ roomId: roomId })
+    .match({ roomId })
     .project({
       messageCount: { $size: { $ifNull: ["$messages", []] } },
     })

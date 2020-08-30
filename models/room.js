@@ -3,9 +3,7 @@ const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 
 let Room = new Schema({
-  roomId: {
-    type: String,
-  },
+  roomId: { type: String, index: true },
   messages: [
     {
       socketId: {

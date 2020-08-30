@@ -1,7 +1,11 @@
 const mongoose = require("mongoose");
-const assert = require("assert");
-const dbURI = `mongodb+srv://${process.env.MONGO_USER}:${process.env.MONGO_PASSWORD}@cluster0.8uqdg.gcp.mongodb.net/${process.env.MONGO_DB}?retryWrites=true&w=majority`;
-mongoose.connect(dbURI, { useNewUrlParser: true, useUnifiedTopology: true });
+const uri = `mongodb+srv://${process.env.MONGO_USER}:${process.env.MONGO_PASSWORD}@cluster0.8uqdg.gcp.mongodb.net/${process.env.MONGO_DB}?retryWrites=true&w=majority`;
+mongoose.connect(uri, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  useFindAndModify: false,
+  autoIndex: false,
+});
 
 const db = mongoose.connection;
 db.on("error", console.error.bind(console, "connection error:"));
@@ -12,16 +16,29 @@ module.exports = db;
 const Room = require("../models/room");
 
 const createRoom = async (roomId) => {
-  const exists = await Room.exists({ roomId });
-  if (!exists) {
-    await Room.create({ roomId, messages: [] });
-  }
+  await Room.findOneAndUpdate(
+    { roomId: roomId },
+    { roomId: roomId },
+    { upsert: true }
+  ).exec();
 };
 
 const createMessage = async (roomId, socketId, nick, message) => {
-  const room = await Room.findOne({ roomId }).exec();
-  room.messages.push({ socketId, nick, message });
-  await room.save();
+  const room = await Room.findOneAndUpdate(
+    { roomId },
+    {
+      $push: { messages: { socketId, nick, message } },
+    }
+  ).exec();
+};
+
+const readMessageCount = async (roomId) => {
+  return await Room.aggregate()
+    .match({ roomId: roomId })
+    .project({
+      messageCount: { $size: { $ifNull: ["$messages", []] } },
+    })
+    .exec();
 };
 
 const readMessages = async (roomId) => {
@@ -46,6 +63,7 @@ const readRoom = async (roomId) => {
 module.exports = {
   createRoom,
   createMessage,
+  readMessageCount,
   readMessages,
   readMessagesSlice,
   readRoom,

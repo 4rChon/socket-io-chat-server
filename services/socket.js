@@ -28,15 +28,14 @@ let typists = {};
 let userIdCount = 0;
 
 const messageRoom = (roomId, message) => {
-  //DAL.createMessage(roomId, "SERVER", "SERVER", message).then(() =>
-  io.in(roomId).emit(Response.MESSAGE, { nick: "SERVER", message: message });
-  //);
-};
-
-const log = (roomId = "", msg = "Message not set.") => {
-  if (roomId.length > 0) {
-    messageRoom(roomId, msg);
+  if (roomId.length === 0) {
+    return;
   }
+  mongoService
+    .createMessage(roomId, "SERVER", "SERVER", message)
+    .then(() =>
+      io.in(roomId).emit(Response.MESSAGE, { nick: "SERVER", message: message })
+    );
 };
 
 const setNick = (socket, nick, log) => {
@@ -82,14 +81,14 @@ const setRoom = (socket, roomId, log) => {
         io.emit(Response.UPDATE_ROOM, { [roomId]: roomList[roomId] });
       }
       io.emit(Response.UPDATE_USER, userList[socket.id]);
-
-      if (log) {
-        log(roomId, `${userList[socket.id].nick} joined #${roomId}.`);
-      }
     })
     .catch((err) => {
       console.log(err);
     });
+
+  if (log) {
+    log(roomId, `${userList[socket.id].nick} joined #${roomId}.`);
+  }
 };
 
 const onMessage = (socket, data) => {
@@ -102,15 +101,15 @@ const onCommand = (socket, commands) => {
   switch (commands[0]) {
     case Request.SET_NICK:
       if (commands.length != 2) break;
-      setNick(socket, commands[1], log);
+      setNick(socket, commands[1], messageRoom);
       break;
     case Request.JOIN_ROOM:
       if (commands.length != 2) break;
-      setRoom(socket, commands[1], log);
+      setRoom(socket, commands[1], messageRoom);
       break;
     case Request.LEAVE_ROOM:
       if (commands.length != 1) break;
-      setRoom(socket, "", log);
+      setRoom(socket, "", messageRoom);
       break;
     default:
       console.log(`Bad command: ${commands}`);
@@ -185,7 +184,7 @@ const initSocket = () => {
     userList[socket.id] = { id: socket.id, nick: socket.id, roomId: "Common" };
     socket.emit(Response.SET_ID, socket.id);
     setNick(socket, `anon${++userIdCount}`);
-    setRoom(socket, "Common", log);
+    setRoom(socket, "Common", messageRoom);
     io.emit(Response.ADD_USER, userList[socket.id]);
   });
 

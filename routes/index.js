@@ -38,6 +38,15 @@ router.get("/rooms/:roomId/", async (req, res) => {
   }
 });
 
+router.get("/rooms/:roomId/messageCount/", async (req, res) => {
+  try {
+    const messageCount = await mongoService.readMessageCount(req.params.roomId);
+    res.send(messageCount[0]).status(200);
+  } catch (err) {
+    handleError(err, res);
+  }
+});
+
 router.get("/rooms/:roomId/messages/", async (req, res) => {
   try {
     const messages = await mongoService.readMessages(req.params.roomId);

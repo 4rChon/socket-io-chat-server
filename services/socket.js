@@ -1,22 +1,25 @@
 const socketIo = require("socket.io");
-const API = require("./API");
+const mongoService = require("./mongo-service");
 const server = require("./server");
 const { RequestType, Request, Response } = require("../enums");
 const ADDRESS = process.env.ADDRESS;
 const PORT = process.env.PORT;
 
-const io = socketIo(server, {
-  handlePreflightRequest: (req, res) => {
-    const headers = {
-      "Access-Control-Allow-Headers": "*",
-      "Access-Control-Allow-Origin": `https://${ADDRESS}:${PORT}/`,
-      "Access-Control-Request-Method": "*",
-      "Access-Control-Allow-Credentials": true,
-    };
-    res.writeHead(200, headers);
-    res.end();
-  },
-});
+const io = socketIo(
+  server
+  //   {
+  //   handlePreflightRequest: (req, res) => {
+  //     const headers = {
+  //       "Access-Control-Allow-Headers": "*",
+  //       "Access-Control-Allow-Origin": `https://${ADDRESS}:${PORT}/`,
+  //       "Access-Control-Request-Method": "*",
+  //       "Access-Control-Allow-Credentials": true,
+  //     };
+  //     res.writeHead(200, headers);
+  //     res.end();
+  //   },
+  // }
+);
 
 let userList = {};
 let roomList = {};
@@ -25,8 +28,9 @@ let typists = {};
 let userIdCount = 0;
 
 const messageRoom = (roomId, message) => {
-  API.postMessage(roomId, "SERVER", "SERVER", message);
+  //DAL.createMessage(roomId, "SERVER", "SERVER", message).then(() =>
   io.in(roomId).emit(Response.MESSAGE, { nick: "SERVER", message: message });
+  //);
 };
 
 const log = (roomId = "", msg = "Message not set.") => {
@@ -64,27 +68,34 @@ const setRoom = (socket, roomId, log) => {
     .filter((roomId) => roomId != socket.id)
     .map((roomId) => leaveRoom(socket, roomId, log));
 
-  if (roomId.length > 0) {
-    socket.join(roomId);
-    roomList[roomId] = io.sockets.adapter.rooms[roomId];
-  }
+  mongoService
+    .createRoom(roomId)
+    .then(() => {
+      if (roomId.length > 0) {
+        socket.join(roomId);
+        roomList[roomId] = io.sockets.adapter.rooms[roomId];
+      }
 
-  userList[socket.id].roomId = roomId;
-  socket.emit(Response.SET_ROOM, roomId);
-  if (roomId.length > 0) {
-    io.emit(Response.UPDATE_ROOM, { [roomId]: roomList[roomId] });
-  }
-  io.emit(Response.UPDATE_USER, userList[socket.id]);
+      userList[socket.id].roomId = roomId;
+      socket.emit(Response.SET_ROOM, roomId);
+      if (roomId.length > 0) {
+        io.emit(Response.UPDATE_ROOM, { [roomId]: roomList[roomId] });
+      }
+      io.emit(Response.UPDATE_USER, userList[socket.id]);
 
-  if (log) {
-    log(roomId, `${userList[socket.id].nick} joined #${roomId}.`);
-  }
-  API.postRoom(roomId);
+      if (log) {
+        log(roomId, `${userList[socket.id].nick} joined #${roomId}.`);
+      }
+    })
+    .catch((err) => {
+      console.log(err);
+    });
 };
 
 const onMessage = (socket, data) => {
-  API.postMessage(data.roomId, socket.id, data.nick, data.message);
-  io.in(data.roomId).emit(Response.MESSAGE, data);
+  mongoService
+    .createMessage(data.roomId, socket.id, data.nick, data.message)
+    .then(() => io.in(data.roomId).emit(Response.MESSAGE, data));
 };
 
 const onCommand = (socket, commands) => {

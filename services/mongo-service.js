@@ -24,7 +24,7 @@ const createRoom = async (roomId) => {
 };
 
 const createMessage = async (roomId, socketId, nick, message) => {
-  const room = await Room.findOneAndUpdate(
+  await Room.findOneAndUpdate(
     { roomId },
     {
       $push: { messages: { socketId, nick, message } },

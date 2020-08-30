@@ -69,29 +69,5 @@ router.get("/rooms/:roomId/messages/:offset/:size", async (req, res) => {
   }
 });
 
-router.post("/rooms/", async (req, res) => {
-  try {
-    await mongoService.createRoom(req.body.roomId);
-    res.sendStatus(200);
-  } catch (err) {
-    handleError(err, res);
-  }
-});
-
-router.post("/rooms/:roomId/messages/", async (req, res) => {
-  try {
-    const { socketId, nick, message } = req.body;
-    await mongoService.createMessage(
-      req.params.roomId,
-      socketId,
-      nick,
-      message
-    );
-    res.sendStatus(200);
-  } catch (err) {
-    handleError(err, res);
-  }
-});
-
 exports.routes = routes;
 exports.router = router;
